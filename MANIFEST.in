@@ -1,0 +1,4 @@
+recursive-include githubhooks/public *
+include githubhooks/public/favicon.ico
+recursive-include githubhooks/i18n *
+recursive-include githubhooks/templates *
