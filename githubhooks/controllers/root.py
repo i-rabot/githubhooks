@@ -14,6 +14,7 @@ from tgext.admin.controller import AdminController
 
 from githubhooks.lib.base import BaseController
 from githubhooks.controllers.error import ErrorController
+from githubhooks.controllers.webhooks import WebHooksController
 
 __all__ = ['RootController']
 
@@ -36,6 +37,7 @@ class RootController(BaseController):
     admin = AdminController(model, DBSession, config_type=TGAdminConfig)
 
     error = ErrorController()
+    webhooks = WebHooksController()
 
     def _before(self, *args, **kw):
         tmpl_context.project_name = "githubhooks"
