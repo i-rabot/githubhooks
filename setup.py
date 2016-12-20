@@ -35,6 +35,8 @@ testpkgs = [
 
 install_requires = [
     "TurboGears2 >= 2.3.10",
+    "PyGithub >= 1.29",
+    "importlib >= 1.0.4",
     "Beaker >= 1.8.0",
     "Kajiki >= 0.6.1",
     "zope.sqlalchemy >= 0.4",
