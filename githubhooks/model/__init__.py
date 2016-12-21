@@ -37,6 +37,8 @@ metadata = DeclarativeBase.metadata
 # and import them at the bottom of this file.
 ######
 
+import threading
+git_fetch_lock = threading.Lock()
 
 def init_model(engine):
     """Call me before using any of the tables or classes in the model."""
