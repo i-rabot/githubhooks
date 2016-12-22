@@ -1,0 +1,11 @@
+[app:main]
+use = egg:githubhooks
+
+githublogin = robotusername
+githubpasswd = robotpass
+webhook_secret = some_random_secret_see_github_webhooks
+
+git_path = /usr/local/bin/git
+git_REPONAME_directory = /localpath/to/barerepo
+
+set debug = false
