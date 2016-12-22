@@ -1,5 +1,16 @@
-This file is for you to describe the githubhooks application. Typically
-you would include information such as the information below:
+= Githubhooks
+
+Runs under Turbogears.
+
+Make sure bare repos are owned by apache:
+ * Configure so you can login as apache:
+   * `usermod -s /bin/bash apache`
+ * as apache:
+   * `git clone --bare https://github.com/RetailArchitects/loft.git`
+   * add full directory to app.ini
+
+
+== Default Turbogears instructions:
 
 Installation and Setup
 ======================
