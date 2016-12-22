@@ -1,4 +1,4 @@
-= Githubhooks
+# Githubhooks
 
 Runs under Turbogears.
 
@@ -9,11 +9,9 @@ Make sure bare repos are owned by apache:
    * `git clone --bare https://github.com/RetailArchitects/loft.git`
    * add full directory to app.ini
 
+## Default Turbogears instructions:
 
-== Default Turbogears instructions:
-
-Installation and Setup
-======================
+### Installation and Setup
 
 Install ``githubhooks`` using the setup.py script::
 
