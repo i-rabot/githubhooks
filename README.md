@@ -34,5 +34,6 @@ While developing you may want the server to reload after changes in package file
 
 Then you are ready to go.
 
-Shell:
+Shell::
+
     $ gearbox tgshell
