@@ -8,6 +8,8 @@ Make sure bare repos are owned by apache:
  * as apache:
    * `git clone --bare https://github.com/RetailArchitects/loft.git`
    * add full directory to app.ini
+   
+For code, see main work engine in `githubhooks/githubhooks/controllers/webhooks.py`
 
 ## Default Turbogears instructions:
 
