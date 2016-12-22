@@ -77,6 +77,18 @@ class _InspectionManager(object):
         if err:
             log.info("git fetch: %s" % err)
 
+    def git_file_at(self, filepath, commitid):
+        """
+        use git show to get the file at specified commit
+        """
+        # git show 2dfb0399b41e9603215d98cc7579f7eb8d852a39:src/appserver/pylotengine/appsetup/upgrade/dataupdate.py
+        std, err, exitcode = self.git_command([
+            'show',
+            "%s:%s" % (commitid, filepath)])
+        if exitcode:
+            raise AssertionError("git show failed with %s" % err)
+        return std
+
     def git_command(self, cmd, env=None):
         with git_fetch_lock:
             dir = config['git_%s_directory' % self.repo.name]
@@ -105,6 +117,8 @@ class _PushInspector(_InspectionManager):
         super(_PushInspector, self).__init__(self.push['repository'])
         self._search_regex = None
         self._which_regex = None
+        self._update_entry_re = None
+        self.uuid_keys = {}
 
     @property
     def search_regex(self):
@@ -122,7 +136,14 @@ class _PushInspector(_InspectionManager):
                     for i, p in enumerate(self.PROBLEMS)))
         return self._which_regex
 
-    def git_problem_grep(self, commitid):
+    @property
+    def update_entry_re(self):
+        if not self._update_entry_re:
+            self._update_entry_re = \
+                re.compile(r"""^\s*\(\s*(?P<update_key>\S+)\s*,\s*\[\s*$""")
+        return self._update_entry_re
+
+    def _git_problem_grep(self, commitid):
         # git grep -n -E "(^<<<<<<< HEAD($|[^<])|^=======$|^>>>>>>>($|[^>])|pdb\.set_trace\(\))" 18788395d36ccb462f0ca49583271a714a0963de
         std, err, exitcode = self.git_command([
             'grep',
@@ -148,8 +169,81 @@ class _PushInspector(_InspectionManager):
                 p.msg = self.PROBLEMS[i][1]
         return [str(p) for p in problems]
 
-    def _process_commit(self, commit):
-        errors = self.git_problem_grep(commit.sha)
+    def _find_retailer_rule_files(self, commitid):
+        std, err, exitcode = self.git_command([
+            'ls-tree',
+            '--name-only',
+            commitid,
+            '--',
+            "src/appserver/pylotengine/appsetup/customerdata/"])
+        if exitcode:
+            raise AssertionError("git ls-tree failed with %s" % err)
+        rule_file = re.compile(r"/customerdata/\w{3}.py$")
+        return [pth for pth in std.splitlines() if rule_file.search(pth)]
+
+    def _dataupdate_file_problems(self, filename, commitid, token, require):
+        problems = []
+        updates_re = re.compile(r"^" + token + r"\s*=\s*OrderedDict\(")
+        filetext = self.git_file_at(filename, commitid)
+        lines = iter(filetext.splitlines())
+        for ln in lines:
+            if updates_re.match(ln):
+                break
+        else:
+            # Not found
+            if require:
+                raise AssertionError("Could not find '%s' "
+                    "assignment in %s" % (token, filename))
+            return problems
+        localkeys = set()
+        key_re = self.update_entry_re
+        # continue with same iterator
+        for ln in lines:
+            match = key_re.match(ln)
+            if match:
+                key = match.group('update_key')
+                # keys that are svn revisions (integers) can be duplicate, 
+                # but not in same file.
+                # uuids cannot be duplicated globally
+                isuuid = not key.isdigit()
+                if isuuid:
+                    key = key[1:-1]
+                if key in localkeys:
+                    problems.append("dataupdate key [%s] duplicated "
+                        "in %s" % (key, os.path.basename(filename)))
+                elif isuuid and key in self.uuid_keys:
+                    problems.append("dataupdate key [%s] is in %s and %s" % (
+                        key,
+                        os.path.basename(filename),
+                        self.uuid_keys[key]))
+                # record we've seen this
+                localkeys.add(key)
+                if isuuid:
+                    self.uuid_keys[key] = os.path.basename(filename)
+        return problems
+
+    def _dataupdate_problems(self, commitid):
+        """
+        Make sure dataupdate key isn't a duplicate (copy-paste)
+        """
+        problems = []
+        for retailerfile in self._find_retailer_rule_files(commitid):
+            problems.extend(self._dataupdate_file_problems(
+                retailerfile, 
+                commitid, 
+                'updates',
+                False))
+        problems.extend(self._dataupdate_file_problems(
+            'src/appserver/pylotengine/appsetup/upgrade/dataupdate.py', 
+            commitid, 
+            'UPDATES',
+            True))
+        return problems
+
+    def process_commit(self, commit):
+        errors = self._git_problem_grep(commit.sha)
+        if not errors:
+            errors.extend(self._dataupdate_problems(commit.sha))
         if errors:
             state = GH_ERROR
             info = "\n".join(errors)
@@ -162,13 +256,13 @@ class _PushInspector(_InspectionManager):
     def _process_other_commits(self):
         for c in self.push['commits'][:-1]:
             commit = self.get_commit(c['id'], True)
-            self._process_commit(commit)
+            self.process_commit(commit)
 
     def inspect(self):
         log.info("Processing this push: %s" % self.push['compare'])
         self.git_fetch()
         head_commit = self.get_commit(self.push['head_commit']['id'], True)
-        if not self._process_commit(head_commit):
+        if not self.process_commit(head_commit):
             # If head commit fails, we should check all of them to 
             # indicate where the problem was introduced
             self._process_other_commits()
