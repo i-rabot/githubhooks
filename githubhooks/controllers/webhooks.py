@@ -64,15 +64,26 @@ class _InspectionManager(object):
         env['GIT_ASKPASS'] = os.path.abspath("%s/../../gitcreds.sh" % here)
         env['GITUSER'] = config['githublogin']
         env['GITPASS'] = config['githubpasswd']
-        std, err, exitcode = self.git_command(['fetch'], env)
+        std, err, exitcode = self.git_command([
+                'fetch',
+                'origin',
+                '+refs/heads/*:refs/heads/*',
+                '--prune'], 
+            env)
         if exitcode:
             raise AssertionError("git fetch failed: %s" % err)
+        if std:
+            log.info("git fetch: %s" % std)
+        if err:
+            log.info("git fetch: %s" % err)
 
     def git_command(self, cmd, env=None):
         with git_fetch_lock:
-            os.chdir(config['git_%s_directory' % self.repo.name])
-            childproc = Popen(
-                [config['git_path']] + cmd, 
+            dir = config['git_%s_directory' % self.repo.name]
+            childproc = Popen([
+                    config['git_path'], 
+                    '--git-dir=%s' % dir,
+                ] + cmd, 
                 stdout=PIPE, 
                 stderr=PIPE, 
                 env=env)
