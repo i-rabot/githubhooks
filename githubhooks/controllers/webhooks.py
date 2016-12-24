@@ -261,11 +261,14 @@ class _PushInspector(_InspectionManager):
     def inspect(self):
         log.info("Processing this push: %s" % self.push['compare'])
         self.git_fetch()
-        head_commit = self.get_commit(self.push['head_commit']['id'], True)
-        if not self.process_commit(head_commit):
-            # If head commit fails, we should check all of them to 
-            # indicate where the problem was introduced
-            self._process_other_commits()
+        head_commit = self.push['head_commit']
+        if head_commit:
+            # convert head_commit to pygithub object
+            head_commit = self.get_commit(head_commit['id'], True)
+            if not self.process_commit(head_commit):
+                # If head commit fails, we should check all of them to 
+                # indicate where the problem was introduced
+                self._process_other_commits()
 
 
 class WebHooksController(BaseController):
