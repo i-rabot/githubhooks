@@ -5,9 +5,9 @@ Runs under Turbogears.
 Make sure bare repos are owned by apache:
  * Configure so you can login as apache:
    * `usermod -s /bin/bash apache`
- * as apache:
+ * as apache (for permissions' sake):
    * `git clone --bare https://github.com/RetailArchitects/loft.git`
-   * add full directory to app.ini
+   * add full path to app.ini
    
 For code, see main work engine in `githubhooks/githubhooks/controllers/webhooks.py`
 
