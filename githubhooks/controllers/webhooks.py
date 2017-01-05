@@ -156,7 +156,7 @@ class _PushInspector(_InspectionManager):
            exitcode and err:
             raise AssertionError("git grep failed with %s" % err)
         # git grep will return ':' delimited
-        problems = [_Problem(*p.split(':')) for p in std.splitlines()]
+        problems = [_Problem(*p.split(':', 3)) for p in std.splitlines()]
         for p in problems:
             # figure out which re was matched...
             match = self.which_regex.search(p.line)
