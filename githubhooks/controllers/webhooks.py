@@ -241,6 +241,7 @@ class _PushInspector(_InspectionManager):
         return problems
 
     def process_commit(self, commit):
+        log.info("    processing commit %s" % commit.sha)
         errors = self._git_problem_grep(commit.sha)
         if not errors:
             errors.extend(self._dataupdate_problems(commit.sha))
@@ -254,6 +255,10 @@ class _PushInspector(_InspectionManager):
         return not errors
 
     def _process_other_commits(self):
+        # This takes too long in the foreground, GitHub expects this to
+        # take place in the background, so just check the head commit...
+        return
+        
         for c in self.push['commits'][:-1]:
             commit = self.get_commit(c['id'], True)
             self.process_commit(commit)
