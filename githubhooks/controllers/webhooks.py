@@ -148,6 +148,7 @@ class _PushInspector(_InspectionManager):
         std, err, exitcode = self.git_command([
             'grep',
             '-n',
+            '-I',
             '-E',
             self.search_regex,
             commitid])
