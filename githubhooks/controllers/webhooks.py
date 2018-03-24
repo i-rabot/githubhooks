@@ -109,6 +109,7 @@ class _PushInspector(_InspectionManager):
         (r'^=======$', 'Conflict marker'),
         (r'^>>>>>>>($|[^>])', 'Conflict end marker'),
         (r'pdb\.set_trace\(\)', 'Breakpoint'),
+        (r'\bdebugger\s*;', 'js debugger'),
     ]
     
     def __init__(self, payload):
