@@ -38,6 +38,7 @@ metadata = DeclarativeBase.metadata
 ######
 
 import threading
+# NOTE: this requires max of one process! (Not multiprocess safe)
 git_fetch_lock = threading.Lock()
 
 def init_model(engine):
