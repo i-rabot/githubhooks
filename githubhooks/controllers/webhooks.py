@@ -21,14 +21,18 @@ GH_ERROR = 'error'
 GH_FAILURE = 'failure'
 
 
+class GitFileNotFound(Exception):
+    pass
+
+
 class _Problem(object):
     
-    def __init__(self, rev, filename, lineno, line):
+    def __init__(self, rev, filename, lineno, line, msg='Problem'):
         self.rev = rev
         self.filename = filename
         self.lineno = lineno
         self.line = line
-        self.msg = 'Problem'
+        self.msg = msg
         
     def __str__(self):
         return "{msg} at {filename},{lineno}: {line}".format(**self.__dict__)
@@ -86,6 +90,9 @@ class _InspectionManager(object):
             'show',
             "%s:%s" % (commitid, filepath)])
         if exitcode:
+            if exitcode == 128 and \
+               re.search(r"Path .* does not exist in", err):
+                raise GitFileNotFound(filepath)
             raise AssertionError("git show failed with %s" % err)
         return std
 
@@ -100,6 +107,21 @@ class _InspectionManager(object):
                 stderr=PIPE, 
                 env=env)
             return childproc.communicate() + (childproc.returncode,)
+
+    def git_grep(self, args):
+        # -n: include line number
+        # -I: skip binary files
+        std, err, exitcode = self.git_command([
+            'grep',
+            '-n',
+            '-I',
+            ] + args)
+        # exitcode 1 with blank err means passed, just no results
+        if exitcode > 1 or \
+           exitcode and err:
+            raise AssertionError("git grep failed with %s" % err)
+        # git grep will return ':' delimited
+        return std.splitlines()
 
 
 class _PushInspector(_InspectionManager):
@@ -145,20 +167,13 @@ class _PushInspector(_InspectionManager):
         return self._update_entry_re
 
     def _git_problem_grep(self, commitid):
-        # git grep -n -E "(^<<<<<<< HEAD($|[^<])|^=======$|^>>>>>>>($|[^>])|pdb\.set_trace\(\))" 18788395d36ccb462f0ca49583271a714a0963de
-        std, err, exitcode = self.git_command([
-            'grep',
-            '-n',
-            '-I',
+        # git grep -n -I -E "(^<<<<<<< HEAD($|[^<])|^=======$|^>>>>>>>($|[^>])|pdb\.set_trace\(\))" 18788395d36ccb462f0ca49583271a714a0963de
+        results = self.git_grep([
             '-E',
             self.search_regex,
             commitid])
-        # exitcode 1 with blank err means passed, just no results
-        if exitcode > 1 or \
-           exitcode and err:
-            raise AssertionError("git grep failed with %s" % err)
         # git grep will return ':' delimited
-        problems = [_Problem(*p.split(':', 3)) for p in std.splitlines()]
+        problems = [_Problem(*p.split(':', 3)) for p in results]
         for p in problems:
             # figure out which re was matched...
             match = self.which_regex.search(p.line)
@@ -224,6 +239,29 @@ class _PushInspector(_InspectionManager):
                     self.uuid_keys[key] = os.path.basename(filename)
         return problems
 
+    def _linelength_problems(self, commitid):
+        """
+        Check code lines for length issues. 
+        .wsignore file is used to exclude files from git grep
+        """
+        try:
+            filetext = self.git_file_at('.wsignore', commitid)
+        except GitFileNotFound:
+            # do no line checks without .wsignore file in commit
+            return []
+        ignores = [':!' + fn.strip() for fn in 
+            filetext.splitlines() if fn.strip()]
+        results = self.git_grep([
+            '-E',
+            "^.{80,}",
+            commitid,
+            '--',
+            '*.py'
+            ] + ignores)
+        # git grep will return ':' delimited
+        return [str(_Problem(*p.split(':', 3), msg='Line >= 80 chars')) for
+            p in results]
+
     def _dataupdate_problems(self, commitid):
         """
         Make sure dataupdate key isn't a duplicate (copy-paste)
@@ -245,6 +283,8 @@ class _PushInspector(_InspectionManager):
     def process_commit(self, commit):
         log.info("    processing commit %s" % commit.sha)
         errors = self._git_problem_grep(commit.sha)
+        if not errors:
+            errors.extend(self._linelength_problems(commit.sha))
         if not errors:
             errors.extend(self._dataupdate_problems(commit.sha))
         if errors:
